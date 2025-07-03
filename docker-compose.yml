@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres
+    container_name: pg-db
+    restart: always
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: alex1234
+    ports:
+      - "5432:5432"
+    volumes:
+      - ${HOME}/pgdata:/var/lib/postgresql/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    platform: linux/arm64
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    platform: linux/arm64
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=alex1234
+      - DB_NAME=postgres
+      - REDIS_ADDRESS=redis:6379
