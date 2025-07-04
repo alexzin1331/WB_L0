@@ -43,13 +43,14 @@ func initRedis(config models.Config) (*redis.Client, error) {
 	return rdb, nil
 }
 
+// run migrations for PostgreSQL
 func runMigrations(db *sql.DB) error {
 	const op = "storage.migrations"
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
-
+	//init new Migrate struct
 	m, err := migrate.NewWithDatabaseInstance(
 		migrationPath,
 		"postgres",
@@ -59,6 +60,7 @@ func runMigrations(db *sql.DB) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
+	//run migrations (up)
 	if err = m.Up(); err != nil {
 		if err != migrate.ErrNoChange {
 			return fmt.Errorf("%s: %w", op, err)
@@ -78,9 +80,11 @@ func New(c models.Config) (*Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	//attempting to reconnect to the database.
 	if err = waitForDB(db, 5, 1*time.Second); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	//test connection
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -89,15 +93,18 @@ func New(c models.Config) (*Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s (initRedis): %w", op, err)
 	}
-
 	s := &Storage{
 		db:    db,
 		redis: rdb,
 	}
+
+	//create tables in PostgreSQL
 	if err = runMigrations(db); err != nil {
 		return &Storage{}, fmt.Errorf("failed to make migrations: %w", err)
 	}
-	log.Printf("\n\nmigraitions is success\n\n")
+	log.Printf("\nmigraitions is success\n")
+
+	//loads the most recent order UIDs from the database (up to cacheLimit = 1000)
 	if err := s.preloadCache(); err != nil {
 		log.Printf("%s: %w", op, err)
 	}
@@ -125,6 +132,7 @@ func waitForDB(db *sql.DB, attempts int, delay time.Duration) error {
 func (s *Storage) preloadCache() error {
 	const op = "storage.preloadCache"
 	ctx := context.Background()
+	//select the most recent order UIDs from PostgreSQL
 	rows, err := s.db.QueryContext(ctx, `SELECT order_uid FROM orders ORDER BY date_created DESC LIMIT $1`, cacheLimit)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -165,6 +173,7 @@ func (s *Storage) batchPreload(uids []string) {
 				<-sem
 				wg.Done()
 			}()
+			//select order from PostgreSQL
 			order, err := s.getFromDB(uid)
 			if err != nil {
 				log.Printf("Preload get order error (UID: %s): %v", uid, err)
@@ -173,6 +182,7 @@ func (s *Storage) batchPreload(uids []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
+			//save order in redis
 			if err := s.saveToRedis(ctx, order); err != nil {
 				log.Printf("(Preload) save order to redis error (UID: %s): %v", uid, err)
 			}
@@ -217,7 +227,7 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 		return fmt.Errorf("failed to insert order: %w", err)
 	}
 
-	// 2. Save main
+	// 2. Save deliveries
 	deliveryQuery := `INSERT INTO deliveries (
 		order_uid, name, phone, zip, city, address, region, email
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`

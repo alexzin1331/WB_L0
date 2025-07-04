@@ -19,14 +19,19 @@ const (
 )
 
 func main() {
+	//init config
 	cfg := models.MustLoad(configPath)
+	//init PostrgeSQL
 	db, err := storage.New(*cfg)
 	if err != nil {
 		log.Fatalf("can't set connection to postgres: %v", err)
 	}
+	//init kafka
 	reader := k.NewReader()
 	defer reader.Close()
+	//init service
 	serv := service.NewService(db)
+	//init router
 	router := gin.Default()
 	router.GET("/", func(c *gin.Context) {
 		//c.File("./server/static/index.html") -- local

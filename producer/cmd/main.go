@@ -59,6 +59,7 @@ func main() {
 	ticker := time.NewTicker(sendInterval)
 	defer ticker.Stop()
 
+	//creating a scheduler for sending messages
 	for {
 		select {
 		case <-ticker.C:

@@ -23,8 +23,8 @@ func NewService(o OrderProvider) *Service {
 // GetOrder handler
 func (s *Service) GetOrder(c *gin.Context) {
 	orderUID := c.Param("order_uid")
+	//get order from PostgreSQL or Redis
 	order, err := s.OrderProvider.GetOrder(orderUID)
-
 	if err != nil {
 		log.Printf("error of getting order: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error: ": err.Error()})

@@ -39,11 +39,13 @@ func NewReader() *kafka.Reader {
 // ReadMSG listen kafkaBroker message and passes it for processing (validate and saving to postgres and redis)
 func ReadMSG(db *storage.Storage, reader *kafka.Reader) {
 	for {
+		//get messages
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
 			log.Printf("Failed to read message: %v", err)
 			continue
 		}
+		//pass messages for processing
 		if err := processMessage(db, msg); err != nil {
 			log.Printf("Failed to process message: %v", err)
 		}
@@ -64,10 +66,10 @@ func processMessage(db *storage.Storage, msg kafka.Message) error {
 		return fmt.Errorf("invalid order data: %w", err)
 	}
 
-	// save to PostgreSQL and redis
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// save to PostgreSQL and redis
 	if err := db.SaveOrder(ctx, order); err != nil {
 		return fmt.Errorf("failed to save order: %w", err)
 	}
