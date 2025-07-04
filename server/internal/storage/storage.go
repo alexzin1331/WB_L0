@@ -319,11 +319,15 @@ func (s *Storage) getFromCache(ctx context.Context, orderUID string) (*models.Or
 func (s *Storage) GetOrder(orderUID string) (*models.Order, error) {
 	cachedOrder, err := s.getFromCache(context.Background(), orderUID)
 	//the special message that the data is taken from the cache!
+	t1 := time.Now().UnixNano()
 	if err == nil {
 		log.Printf("-------------\nget from cache success\n---------------")
+		log.Println("time for get from CACHE: (ns): ", time.Now().UnixNano()-t1)
 		return cachedOrder, nil
 	}
 	order, err := s.getFromDB(orderUID)
+	log.Printf("-------------\nget from DB success\n---------------")
+	log.Println("time for get from PostgreSQL: (ns): ", time.Now().UnixNano()-t1)
 	if err != nil {
 		return nil, fmt.Errorf("error of getting order from DB: %v", err)
 	}
