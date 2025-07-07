@@ -355,6 +355,7 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 	}
 	defer tx.Rollback()
 
+	//1. receiving main order data
 	order := models.Order{OrderUID: orderUID}
 	orderQuery := `SELECT 
 		track_number, entry, locale, internal_signature, customer_id, 
