@@ -120,7 +120,7 @@ var (
 
 func (o *Order) Validate() error {
 	if o.OrderUID == "" {
-		return errors.New("order_uid is required")
+		return &ValidationError{Field: "order_uid", Message: "is required"}
 	}
 
 	if len(o.OrderUID) < 10 || len(o.OrderUID) > 50 {
