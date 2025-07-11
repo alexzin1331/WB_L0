@@ -8,14 +8,21 @@ import (
 	"fmt"
 	"github.com/segmentio/kafka-go"
 	"log"
+	"math"
+	"math/rand"
 	"time"
 )
 
 const (
-	//kafkaBroker     = "localhost:9092" -- local
-	kafkaBroker  = "kafka:9092"
-	kafkaTopic   = "orders"
-	kafkaGroupID = "order-consumers"
+	//kafkaBroker  = "localhost:9092" -- local
+
+	kafkaBroker     = "kafka:9092"
+	kafkaTopic      = "orders"
+	kafkaDlqTopic   = "orders_dlq"
+	kafkaGroupID    = "order-consumers"
+	maxRetryAttempt = 5
+	initialBackoff  = 100 * time.Millisecond
+	maxBackoff      = 5 * time.Second
 )
 
 func NewReader() *kafka.Reader {
@@ -59,7 +66,6 @@ func ReadMSG(db *storage.Storage, reader *kafka.Reader) {
 	defer dlqWriter.Close()
 
 	for {
-		//get messages
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
 			log.Printf("Failed to read message: %v", err)
