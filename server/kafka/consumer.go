@@ -36,7 +36,24 @@ func NewReader() *kafka.Reader {
 	return reader
 }
 
-// ReadMSG listen kafkaBroker message and passes it for processing (validate and saving to postgres and redis)
+func NewDLQWriter() *kafka.Writer {
+	return &kafka.Writer{
+		Addr:         kafka.TCP(kafkaBroker),
+		Topic:        kafkaDlqTopic,
+		Balancer:     &kafka.Hash{},
+		MaxAttempts:  3,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		Logger: kafka.LoggerFunc(func(s string, args ...interface{}) {
+			log.Printf("[KAFKA-DLQ] "+s, args...)
+		}),
+		ErrorLogger: kafka.LoggerFunc(func(s string, args ...interface{}) {
+			log.Printf("[KAFKA-DLQ-ERROR] "+s, args...)
+		}),
+	}
+}
+
+// ReadMSG listens for Kafka messages and processes them with retry and DLQ
 func ReadMSG(db *storage.Storage, reader *kafka.Reader) {
 	for {
 		//get messages
