@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"github.com/ilyakaznacheev/cleanenv"
 	"log"
@@ -124,15 +123,15 @@ func (o *Order) Validate() error {
 	}
 
 	if len(o.OrderUID) < 10 || len(o.OrderUID) > 50 {
-		return errors.New("order_uid must be 10-50 characters")
+		return &ValidationError{Field: "order_uid", Message: "must be 10-50 characters"}
 	}
 
 	if !trackNumRegex.MatchString(o.TrackNumber) {
-		return errors.New("invalid track_number format")
+		return &ValidationError{Field: "track_number", Message: "invalid format"}
 	}
 
 	if o.Entry == "" {
-		return errors.New("entry is required")
+		return &ValidationError{Field: "entry", Message: "is required"}
 	}
 
 	// Delivery validation
@@ -147,7 +146,7 @@ func (o *Order) Validate() error {
 
 	// Items validation
 	if len(o.Items) == 0 {
-		return errors.New("order must contain at least one item")
+		return &ValidationError{Field: "items", Message: "order must contain at least one item"}
 	}
 
 	for i, item := range o.Items {
@@ -157,35 +156,35 @@ func (o *Order) Validate() error {
 	}
 
 	if o.Locale != "en" && o.Locale != "ru" {
-		return errors.New("locale must be either 'en' or 'ru'")
+		return &ValidationError{Field: "locale", Message: "must be either 'en' or 'ru'"}
 	}
 
 	if o.CustomerID == "" {
-		return errors.New("customer_id is required")
+		return &ValidationError{Field: "customer_id", Message: "is required"}
 	}
 
 	if o.DeliveryService == "" {
-		return errors.New("delivery_service is required")
+		return &ValidationError{Field: "delivery_service", Message: "is required"}
 	}
 
 	if o.Shardkey == "" {
-		return errors.New("shardkey is required")
+		return &ValidationError{Field: "shardkey", Message: "is required"}
 	}
 
 	if o.SmID < 0 {
-		return errors.New("sm_id must be positive")
+		return &ValidationError{Field: "sm_id", Message: "must be positive"}
 	}
 
 	if o.DateCreated.IsZero() {
-		return errors.New("date_created is required")
+		return &ValidationError{Field: "date_created", Message: "is required"}
 	}
 
 	if o.DateCreated.After(time.Now().Add(1 * time.Hour)) {
-		return errors.New("date_created cannot be in the future")
+		return &ValidationError{Field: "date_created", Message: "cannot be in the future"}
 	}
 
 	if o.OofShard == "" {
-		return errors.New("oof_shard is required")
+		return &ValidationError{Field: "oof_shard", Message: "is required"}
 	}
 
 	return nil
@@ -193,31 +192,31 @@ func (o *Order) Validate() error {
 
 func (d *Delivery) Validate() error {
 	if d.Name == "" {
-		return errors.New("name is required")
+		return &ValidationError{Field: "name", Message: "is required"}
 	}
 
 	if !phoneRegex.MatchString(d.Phone) {
-		return errors.New("invalid phone format")
+		return &ValidationError{Field: "phone", Message: "invalid format"}
 	}
 
 	if len(d.Zip) < 5 || len(d.Zip) > 20 {
-		return errors.New("zip must be 5-20 characters")
+		return &ValidationError{Field: "zip", Message: "must be 5-20 characters"}
 	}
 
 	if d.City == "" {
-		return errors.New("city is required")
+		return &ValidationError{Field: "city", Message: "is required"}
 	}
 
 	if d.Address == "" {
-		return errors.New("address is required")
+		return &ValidationError{Field: "address", Message: "is required"}
 	}
 
 	if d.Region == "" {
-		return errors.New("region is required")
+		return &ValidationError{Field: "region", Message: "is required"}
 	}
 
 	if !emailRegex.MatchString(d.Email) {
-		return errors.New("invalid email format")
+		return &ValidationError{Field: "email", Message: "invalid format"}
 	}
 
 	return nil
@@ -225,39 +224,39 @@ func (d *Delivery) Validate() error {
 
 func (p *Payment) Validate() error {
 	if p.Transaction == "" {
-		return errors.New("transaction is required")
+		return &ValidationError{Field: "transaction", Message: "is required"}
 	}
 
 	if p.Currency != "USD" && p.Currency != "EUR" && p.Currency != "RUB" {
-		return errors.New("invalid currency")
+		return &ValidationError{Field: "currency", Message: "invalid currency"}
 	}
 
 	if p.Provider != "wbpay" && p.Provider != "applepay" && p.Provider != "googlepay" {
-		return errors.New("invalid payment provider")
+		return &ValidationError{Field: "provider", Message: "invalid payment provider"}
 	}
 
 	if p.Amount <= 0 {
-		return errors.New("amount must be positive")
+		return &ValidationError{Field: "amount", Message: "must be positive"}
 	}
 
 	if p.PaymentDt <= 0 {
-		return errors.New("payment_dt must be positive")
+		return &ValidationError{Field: "payment_dt", Message: "must be positive"}
 	}
 
 	if p.Bank == "" {
-		return errors.New("bank is required")
+		return &ValidationError{Field: "bank", Message: "is required"}
 	}
 
 	if p.DeliveryCost < 0 {
-		return errors.New("delivery_cost cannot be negative")
+		return &ValidationError{Field: "delivery_cost", Message: "cannot be negative"}
 	}
 
 	if p.GoodsTotal <= 0 {
-		return errors.New("goods_total must be positive")
+		return &ValidationError{Field: "goods_total", Message: "must be positive"}
 	}
 
 	if p.CustomFee < 0 {
-		return errors.New("custom_fee cannot be negative")
+		return &ValidationError{Field: "custom_fee", Message: "cannot be negative"}
 	}
 
 	return nil
@@ -265,47 +264,47 @@ func (p *Payment) Validate() error {
 
 func (i *Item) Validate() error {
 	if i.ChrtID <= 0 {
-		return errors.New("chrt_id must be positive")
+		return &ValidationError{Field: "chrt_id", Message: "must be positive"}
 	}
 
 	if !trackNumRegex.MatchString(i.TrackNumber) {
-		return errors.New("invalid track_number format")
+		return &ValidationError{Field: "track_number", Message: "invalid format"}
 	}
 
 	if i.Price <= 0 {
-		return errors.New("price must be positive")
+		return &ValidationError{Field: "price", Message: "must be positive"}
 	}
 
 	if i.Rid == "" {
-		return errors.New("rid is required")
+		return &ValidationError{Field: "rid", Message: "is required"}
 	}
 
 	if i.Name == "" {
-		return errors.New("name is required")
+		return &ValidationError{Field: "name", Message: "is required"}
 	}
 
 	if i.Sale < 0 || i.Sale > 100 {
-		return errors.New("sale must be 0-100")
+		return &ValidationError{Field: "sale", Message: "must be 0-100"}
 	}
 
 	if i.Size == "" {
-		return errors.New("size is required")
+		return &ValidationError{Field: "size", Message: "is required"}
 	}
 
 	if i.TotalPrice <= 0 {
-		return errors.New("total_price must be positive")
+		return &ValidationError{Field: "total_price", Message: "must be positive"}
 	}
 
 	if i.NmID <= 0 {
-		return errors.New("nm_id must be positive")
+		return &ValidationError{Field: "nm_id", Message: "must be positive"}
 	}
 
 	if i.Brand == "" {
-		return errors.New("brand is required")
+		return &ValidationError{Field: "brand", Message: "is required"}
 	}
 
 	if i.Status < 0 {
-		return errors.New("status cannot be negative")
+		return &ValidationError{Field: "status", Message: "cannot be negative"}
 	}
 
 	return nil
