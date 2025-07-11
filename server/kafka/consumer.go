@@ -55,6 +55,9 @@ func NewDLQWriter() *kafka.Writer {
 
 // ReadMSG listens for Kafka messages and processes them with retry and DLQ
 func ReadMSG(db *storage.Storage, reader *kafka.Reader) {
+	dlqWriter := NewDLQWriter()
+	defer dlqWriter.Close()
+
 	for {
 		//get messages
 		msg, err := reader.ReadMessage(context.Background())
