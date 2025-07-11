@@ -9,6 +9,15 @@ import (
 	"time"
 )
 
+type ValidationError struct {
+	Field   string
+	Message string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("validation error: %s - %s", e.Field, e.Message)
+}
+
 // Config with yaml-tags
 type Config struct {
 	ServConf ServerCfg   `yaml:"server"`
