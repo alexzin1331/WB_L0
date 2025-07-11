@@ -62,9 +62,27 @@ func ReadMSG(db *storage.Storage, reader *kafka.Reader) {
 			log.Printf("Failed to read message: %v", err)
 			continue
 		}
-		//pass messages for processing
-		if err := processMessage(db, msg); err != nil {
-			log.Printf("Failed to process message: %v", err)
+
+		if err := processWithRetry(db, dlqWriter, msg); err != nil {
+			log.Printf("Failed to process message after retries, moved to DLQ: %v", err)
+		}
+	}
+}
+
+func processWithRetry(db *storage.Storage, dlqWriter *kafka.Writer, msg kafka.Message) error {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetryAttempt; attempt++ {
+		if attempt > 0 {
+			backoff := calculateBackoff(attempt)
+			log.Printf("Retry attempt %d/%d after %v for message offset=%d",
+				attempt, maxRetryAttempt, backoff, msg.Offset)
+			time.Sleep(backoff)
+		}
+
+		err := processMessage(db, msg)
+		if err == nil {
+			return nil // Success
 		}
 	}
 }
