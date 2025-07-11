@@ -84,7 +84,61 @@ func processWithRetry(db *storage.Storage, dlqWriter *kafka.Writer, msg kafka.Me
 		if err == nil {
 			return nil // Success
 		}
+
+		lastErr = err
+		log.Printf("Attempt %d/%d failed: %v", attempt+1, maxRetryAttempt, err)
+
+		// Don't retry for validation errors
+		if _, ok := err.(*models.ValidationError); ok {
+			break
+		}
 	}
+
+	// All retries failed, send to DLQ
+	if err := sendToDLQ(dlqWriter, msg, lastErr); err != nil {
+		return fmt.Errorf("failed to send to DLQ: %w (original error: %v)", err, lastErr)
+	}
+
+	return lastErr
+}
+
+func calculateBackoff(attempt int) time.Duration {
+	// Exponential backoff with jitter
+	backoff := float64(initialBackoff) * math.Pow(2, float64(attempt))
+	if backoff > float64(maxBackoff) {
+		backoff = float64(maxBackoff)
+	}
+
+	// Add jitter to avoid thundering herd
+	jitter := rand.Float64() * (backoff * 0.2) // ±20% jitter
+	backoff = backoff - (backoff * 0.1) + jitter
+
+	return time.Duration(backoff)
+}
+
+func sendToDLQ(writer *kafka.Writer, msg kafka.Message, processingErr error) error {
+	dlqMessage := struct {
+		OriginalMessage kafka.Message
+		Error           string
+		Timestamp       time.Time
+	}{
+		OriginalMessage: msg,
+		Error:           processingErr.Error(),
+		Timestamp:       time.Now(),
+	}
+
+	dlqData, err := json.Marshal(dlqMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal DLQ message: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return writer.WriteMessages(ctx, kafka.Message{
+		Key:   msg.Key,
+		Value: dlqData,
+	})
 }
 
 func processMessage(db *storage.Storage, msg kafka.Message) error {
