@@ -1,0 +1,49 @@
+{
+  "customer_id": "string",
+  "date_created": "string",
+  "delivery": {
+    "address": "string",
+    "city": "string",
+    "email": "string",
+    "name": "string",
+    "phone": "string",
+    "region": "string",
+    "zip": "string"
+  },
+  "delivery_service": "string",
+  "entry": "string",
+  "internal_signature": "string",
+  "items": [
+    {
+      "brand": "string",
+      "chrt_id": 0,
+      "name": "string",
+      "nm_id": 0,
+      "price": 0,
+      "rid": "string",
+      "sale": 0,
+      "size": "string",
+      "status": 0,
+      "total_price": 0,
+      "track_number": "string"
+    }
+  ],
+  "locale": "string",
+  "oof_shard": "string",
+  "order_uid": "string",
+  "payment": {
+    "amount": 0,
+    "bank": "string",
+    "currency": "string",
+    "custom_fee": 0,
+    "delivery_cost": 0,
+    "goods_total": 0,
+    "payment_dt": 0,
+    "provider": "string",
+    "request_id": "string",
+    "transaction": "string"
+  },
+  "shardkey": "string",
+  "sm_id": 0,
+  "track_number": "string"
+}

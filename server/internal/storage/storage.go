@@ -10,6 +10,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"log"
 	"sync"
 	"time"
@@ -48,7 +49,7 @@ func runMigrations(db *sql.DB) error {
 	const op = "storage.migrations"
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %v", op, err)
 	}
 	//init new Migrate struct
 	m, err := migrate.NewWithDatabaseInstance(
@@ -57,13 +58,13 @@ func runMigrations(db *sql.DB) error {
 		driver,
 	)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %v", op, err)
 	}
 
 	//run migrations (up)
 	if err = m.Up(); err != nil {
 		if err != migrate.ErrNoChange {
-			return fmt.Errorf("%s: %w", op, err)
+			return fmt.Errorf("%s: %v", op, err)
 		}
 		log.Println("No migrations to apply.")
 	} else {
@@ -78,20 +79,20 @@ func New(c models.Config) (*Storage, error) {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", c.DBConf.Host, c.DBConf.Port, c.DBConf.User, c.DBConf.Password, c.DBConf.DBName)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %v", op, err)
 	}
 	//attempting to reconnect to the database.
 	if err = waitForDB(db, 5, 1*time.Second); err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %v", op, err)
 	}
 	//test connection
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %v", op, err)
 	}
 	log.Println("Connection is ready")
 	rdb, err := initRedis(c)
 	if err != nil {
-		return nil, fmt.Errorf("%s (initRedis): %w", op, err)
+		return nil, fmt.Errorf("%s (initRedis): %v", op, err)
 	}
 	s := &Storage{
 		db:    db,
@@ -100,13 +101,13 @@ func New(c models.Config) (*Storage, error) {
 
 	//create tables in PostgreSQL
 	if err = runMigrations(db); err != nil {
-		return &Storage{}, fmt.Errorf("failed to make migrations: %w", err)
+		return &Storage{}, fmt.Errorf("failed to make migrations: %v", err)
 	}
 	log.Printf("\nmigraitions is success\n")
 
 	//loads the most recent order UIDs from the database (up to cacheLimit = 1000)
 	if err := s.preloadCache(); err != nil {
-		log.Printf("%s: %w", op, err)
+		log.Printf("%s: %v", op, err)
 	}
 	return s, nil
 }
@@ -135,13 +136,13 @@ func (s *Storage) preloadCache() error {
 	//select the most recent order UIDs from PostgreSQL
 	rows, err := s.db.QueryContext(ctx, `SELECT order_uid FROM orders ORDER BY date_created DESC LIMIT $1`, cacheLimit)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %v", op, err)
 	}
 	orderUids := make([]string, 0)
 	for rows.Next() {
 		var uid string
 		if err := rows.Scan(&uid); err != nil {
-			log.Printf("%s: %w", op, err)
+			log.Printf("%s: %v", op, err)
 			continue
 		}
 		orderUids = append(orderUids, uid)
@@ -195,7 +196,7 @@ func (s *Storage) batchPreload(uids []string) {
 func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
 	defer func() {
 		if err != nil {
@@ -224,7 +225,7 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 		order.OofShard,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert order: %w", err)
+		return fmt.Errorf("failed to insert order: %v", err)
 	}
 
 	// 2. Save deliveries
@@ -243,7 +244,7 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 		order.Delivery.Email,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert delivery: %w", err)
+		return fmt.Errorf("failed to insert delivery: %v", err)
 	}
 
 	// 3. Save payment
@@ -266,7 +267,7 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 		order.Payment.CustomFee,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert payment: %w", err)
+		return fmt.Errorf("failed to insert payment: %v", err)
 	}
 
 	// 4. Save items
@@ -291,13 +292,13 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 			item.Status,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to insert item: %w", err)
+			return fmt.Errorf("failed to insert item: %v", err)
 		}
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	log.Printf("Order %s saved successfully", order.OrderUID)
@@ -311,12 +312,12 @@ func (s *Storage) getFromCache(ctx context.Context, orderUID string) (*models.Or
 		if err == redis.Nil {
 			return nil, fmt.Errorf("not found in cache")
 		}
-		return nil, fmt.Errorf("redis get error: %w", err)
+		return nil, fmt.Errorf("redis get error: %v", err)
 	}
 
 	var order models.Order
 	if err := json.Unmarshal([]byte(val), &order); err != nil {
-		return nil, fmt.Errorf("cache decode error: %w", err)
+		return nil, fmt.Errorf("cache decode error: %v", err)
 	}
 
 	return &order, nil
@@ -351,7 +352,7 @@ func (s *Storage) GetOrder(orderUID string) (*models.Order, error) {
 func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
 	}
 	defer tx.Rollback()
 
@@ -379,7 +380,7 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("order not found")
 		}
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, fmt.Errorf("failed to get order: %v", err)
 	}
 
 	// 2. receiving delivery data
@@ -399,7 +400,7 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get delivery: %w", err)
+		return nil, fmt.Errorf("failed to get delivery: %v", err)
 	}
 	order.Delivery = delivery
 
@@ -424,7 +425,7 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get payment: %w", err)
+		return nil, fmt.Errorf("failed to get payment: %v", err)
 	}
 	order.Payment = payment
 
@@ -436,7 +437,7 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 
 	rows, err := tx.Query(itemsQuery, orderUID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get items: %w", err)
+		return nil, fmt.Errorf("failed to get items: %v", err)
 	}
 	defer rows.Close()
 
@@ -457,18 +458,18 @@ func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
 			&item.Status,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan item: %w", err)
+			return nil, fmt.Errorf("failed to scan item: %v", err)
 		}
 		items = append(items, item)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating items: %w", err)
+		return nil, fmt.Errorf("error iterating items: %v", err)
 	}
 	order.Items = items
 
 	if err = tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	return &order, nil
@@ -485,28 +486,28 @@ func (s *Storage) saveToRedis(ctx context.Context, order *models.Order) error {
 	orderJSON, err := json.Marshal(order)
 	const Lkey = "recently used"
 	if err != nil {
-		return fmt.Errorf("marshal error: %w", err)
+		return fmt.Errorf("marshal error: %v", err)
 	}
 	if err = s.redis.Set(ctx, order.OrderUID, orderJSON, 72*time.Hour).Err(); err != nil {
-		return fmt.Errorf("redis set error: %w", err)
+		return fmt.Errorf("redis set error: %v", err)
 	}
 	if err = s.redis.LPush(ctx, Lkey, order.OrderUID).Err(); err != nil {
-		return fmt.Errorf("redis lpush error: %w", err)
+		return fmt.Errorf("redis lpush error: %v", err)
 	}
 	length, err := s.redis.LLen(ctx, Lkey).Result()
 	if err != nil {
-		return fmt.Errorf("redis llen error: %w", err)
+		return fmt.Errorf("redis llen error: %v", err)
 	}
 	if length > cacheLimit {
 		olds, err := s.redis.LRange(ctx, Lkey, int64(cacheLimit), length-1).Result()
 		if err != nil {
-			return fmt.Errorf("redis lrange error: %w", err)
+			return fmt.Errorf("redis lrange error: %v", err)
 		}
 		if err := s.redis.Del(ctx, olds...).Err(); err != nil {
-			return fmt.Errorf("redis del error: %w", err)
+			return fmt.Errorf("redis del error: %v", err)
 		}
 		if err := s.redis.LTrim(ctx, Lkey, 0, int64(cacheLimit)-1).Err(); err != nil {
-			return fmt.Errorf("redis ltrim error: %w", err)
+			return fmt.Errorf("redis ltrim error: %v", err)
 		}
 	}
 	return nil

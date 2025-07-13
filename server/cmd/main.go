@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "WB_LVL0/docs"
 	"WB_LVL0/server/internal/service"
 	"WB_LVL0/server/internal/storage"
 	k "WB_LVL0/server/kafka"
@@ -8,6 +9,8 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
 	"os"
 	"os/signal"
@@ -18,6 +21,11 @@ const (
 	configPath = "config.yaml"
 )
 
+// @title WB_LVL0 API
+// @version 1.0
+// @description API для работы с заказами
+// @host localhost:8080
+// @BasePath /
 func main() {
 	//init config
 	cfg := models.MustLoad(configPath)
@@ -38,7 +46,7 @@ func main() {
 		c.File("./static/index.html")
 
 	})
-
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/order/:order_uid", serv.GetOrder)
 	router.Static("/static", "./static")
 	//router.Static("/server/static", "./server/static")

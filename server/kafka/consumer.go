@@ -102,7 +102,6 @@ func processWithRetry(db *storage.Storage, dlqWriter *kafka.Writer, msg kafka.Me
 			break
 		}
 	}
-
 	// All retries failed, send to DLQ
 	if err := sendToDLQ(dlqWriter, msg, lastErr); err != nil {
 		return fmt.Errorf("failed to send to DLQ: %w (original error: %v)", err, lastErr)

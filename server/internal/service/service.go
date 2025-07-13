@@ -21,6 +21,15 @@ func NewService(o OrderProvider) *Service {
 }
 
 // GetOrder handler
+// @Summary Get order by UID
+// @Description Получить заказ по его уникальному идентификатору
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Param order_uid path string true "Order UID"
+// @Success 200 {object} models.Order
+// @Failure 400 {object} map[string]string
+// @Router /order/{order_uid} [get]
 func (s *Service) GetOrder(c *gin.Context) {
 	orderUID := c.Param("order_uid")
 	//get order from PostgreSQL or Redis
