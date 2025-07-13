@@ -25,3 +25,14 @@
 * server-1     | 2025/07/03 21:18:21 time for get from PostgreSQL: (ns):  3941208
 * server-1     | 2025/07/03 21:18:36 time for get from CACHE: (ns):  202333
 
+#### Примеры запросов на сервер:
+-GET-запрос на http://localhost:8081/order/<order_uid> возвращает JSON с информацией о заказе
+
+#### Примеры ответов сервера:
+- [Положительный ответ](https://github.com/alexzin1331/WB_L0/blob/main/swagger_screenshot/OK_model_json.txt)
+- [Отрицательный ответ](https://github.com/alexzin1331/WB_L0/blob/main/swagger_screenshot/BAD_model_json.txt)
+- [Дополнительная информация (скриншоты)](https://github.com/alexzin1331/WB_L0/tree/main/swagger_screenshot)
+
+#### Для запуска программы:
+1) Клонировать репозиторий
+2) Команда в консоль из корневой директории проекта: `docker-compose up --build`
