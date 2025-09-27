@@ -58,3 +58,5 @@ CREATE TABLE IF NOT EXISTS items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_order_uid ON items(order_uid);
+CREATE INDEX IF NOT EXISTS idx_orders_delivery_service_uid ON orders(delivery_service);
+CREATE INDEX IF NOT EXISTS idx_deliveries_phone ON deliveries(phone);

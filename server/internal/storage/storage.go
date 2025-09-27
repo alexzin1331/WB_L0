@@ -26,8 +26,8 @@ const (
 )
 
 type Storage struct {
-	db    *sql.DB
-	redis *redis.Client
+	DB    *sql.DB
+	Redis *redis.Client
 }
 
 func initRedis(config models.Config) (*redis.Client, error) {
@@ -95,8 +95,8 @@ func New(c models.Config) (*Storage, error) {
 		return nil, fmt.Errorf("%s (initRedis): %v", op, err)
 	}
 	s := &Storage{
-		db:    db,
-		redis: rdb,
+		DB:    db,
+		Redis: rdb,
 	}
 
 	//create tables in PostgreSQL
@@ -134,7 +134,7 @@ func (s *Storage) preloadCache() error {
 	const op = "storage.preloadCache"
 	ctx := context.Background()
 	//select the most recent order UIDs from PostgreSQL
-	rows, err := s.db.QueryContext(ctx, `SELECT order_uid FROM orders ORDER BY date_created DESC LIMIT $1`, cacheLimit)
+	rows, err := s.DB.QueryContext(ctx, `SELECT order_uid FROM orders ORDER BY date_created DESC LIMIT $1`, cacheLimit)
 	if err != nil {
 		return fmt.Errorf("%s: %v", op, err)
 	}
@@ -183,9 +183,9 @@ func (s *Storage) batchPreload(uids []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			//save order in redis
+			//save order in Redis
 			if err := s.saveToRedis(ctx, order); err != nil {
-				log.Printf("(Preload) save order to redis error (UID: %s): %v", uid, err)
+				log.Printf("(Preload) save order to Redis error (UID: %s): %v", uid, err)
 			}
 		}(uid)
 	}
@@ -194,7 +194,7 @@ func (s *Storage) batchPreload(uids []string) {
 
 // SaveOrder save order in PostgreSQL
 func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
-	tx, err := s.db.Begin()
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
@@ -305,14 +305,14 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 	return nil
 }
 
-// get data from redis
+// get data from Redis
 func (s *Storage) getFromCache(ctx context.Context, orderUID string) (*models.Order, error) {
-	val, err := s.redis.Get(ctx, orderUID).Result()
+	val, err := s.Redis.Get(ctx, orderUID).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, fmt.Errorf("not found in cache")
 		}
-		return nil, fmt.Errorf("redis get error: %v", err)
+		return nil, fmt.Errorf("Redis get error: %v", err)
 	}
 
 	var order models.Order
@@ -343,14 +343,14 @@ func (s *Storage) GetOrder(orderUID string) (*models.Order, error) {
 		return nil, fmt.Errorf("error of getting order from DB: %v", err)
 	}
 	if err = s.saveToRedis(context.Background(), order); err != nil {
-		return nil, fmt.Errorf("failed to save data in redis: %v", err)
+		return nil, fmt.Errorf("failed to save data in Redis: %v", err)
 	}
 	return order, nil
 }
 
 // get data from PostgreSQL
 func (s *Storage) getFromDB(orderUID string) (*models.Order, error) {
-	tx, err := s.db.Begin()
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %v", err)
 	}
@@ -488,26 +488,26 @@ func (s *Storage) saveToRedis(ctx context.Context, order *models.Order) error {
 	if err != nil {
 		return fmt.Errorf("marshal error: %v", err)
 	}
-	if err = s.redis.Set(ctx, order.OrderUID, orderJSON, 72*time.Hour).Err(); err != nil {
-		return fmt.Errorf("redis set error: %v", err)
+	if err = s.Redis.Set(ctx, order.OrderUID, orderJSON, 72*time.Hour).Err(); err != nil {
+		return fmt.Errorf("Redis set error: %v", err)
 	}
-	if err = s.redis.LPush(ctx, Lkey, order.OrderUID).Err(); err != nil {
-		return fmt.Errorf("redis lpush error: %v", err)
+	if err = s.Redis.LPush(ctx, Lkey, order.OrderUID).Err(); err != nil {
+		return fmt.Errorf("Redis lpush error: %v", err)
 	}
-	length, err := s.redis.LLen(ctx, Lkey).Result()
+	length, err := s.Redis.LLen(ctx, Lkey).Result()
 	if err != nil {
-		return fmt.Errorf("redis llen error: %v", err)
+		return fmt.Errorf("Redis llen error: %v", err)
 	}
 	if length > cacheLimit {
-		olds, err := s.redis.LRange(ctx, Lkey, int64(cacheLimit), length-1).Result()
+		olds, err := s.Redis.LRange(ctx, Lkey, int64(cacheLimit), length-1).Result()
 		if err != nil {
-			return fmt.Errorf("redis lrange error: %v", err)
+			return fmt.Errorf("Redis lrange error: %v", err)
 		}
-		if err := s.redis.Del(ctx, olds...).Err(); err != nil {
-			return fmt.Errorf("redis del error: %v", err)
+		if err := s.Redis.Del(ctx, olds...).Err(); err != nil {
+			return fmt.Errorf("Redis del error: %v", err)
 		}
-		if err := s.redis.LTrim(ctx, Lkey, 0, int64(cacheLimit)-1).Err(); err != nil {
-			return fmt.Errorf("redis ltrim error: %v", err)
+		if err := s.Redis.LTrim(ctx, Lkey, 0, int64(cacheLimit)-1).Err(); err != nil {
+			return fmt.Errorf("Redis ltrim error: %v", err)
 		}
 	}
 	return nil

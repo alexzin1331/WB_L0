@@ -12,6 +12,8 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,6 +43,7 @@ func main() {
 	serv := service.NewService(db)
 	//init router
 	router := gin.Default()
+	setupPprof(router)
 	router.GET("/", func(c *gin.Context) {
 		//c.File("./server/static/index.html") -- local
 		c.File("./static/index.html")
@@ -69,4 +72,24 @@ func main() {
 	fmt.Println("Consumer started. Waiting for messages...")
 	<-quit
 	fmt.Println("Shutting down consumer...")
+}
+
+// setupPprof настраивает эндпоинты для профилирования
+func setupPprof(router *gin.Engine) {
+	// Группа роутов для pprof
+	pprofGroup := router.Group("/debug/pprof")
+	{
+		pprofGroup.GET("/", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/cmdline", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/profile", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.POST("/symbol", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/symbol", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/trace", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/allocs", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/block", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/goroutine", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/heap", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/mutex", gin.WrapH(http.DefaultServeMux))
+		pprofGroup.GET("/threadcreate", gin.WrapH(http.DefaultServeMux))
+	}
 }
