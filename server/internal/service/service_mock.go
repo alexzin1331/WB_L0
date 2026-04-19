@@ -22,7 +22,6 @@ docker exec -it a39e2ee9b067487f96baf489813f7ac727f89dcef79478cadcdc5b54d6b3bfdd
 
 docker exec -it a39e2ee9b067487f96baf489813f7ac727f89dcef79478cadcdc5b54d6b3bfdd psql -U postgres -d postgres -c ""
 
-
 docker exec -it a39e2ee9b067487f96baf489813f7ac727f89dcef79478cadcdc5b54d6b3bfdd psql -U postgres -d postgres -c "explain (analyze, buffers) SELECT * FROM orders o join deliveries d using (order_uid) where d.phone = '+3989240939'"
 
 */

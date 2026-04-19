@@ -1,0 +1,3 @@
+ALTER TABLE items DROP COLUMN IF EXISTS shardkey;
+ALTER TABLE payments DROP COLUMN IF EXISTS shardkey;
+ALTER TABLE deliveries DROP COLUMN IF EXISTS shardkey;

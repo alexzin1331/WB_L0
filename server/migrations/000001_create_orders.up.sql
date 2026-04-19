@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
     city      VARCHAR(100) NOT NULL,
     address   VARCHAR(200) NOT NULL,
     region    VARCHAR(100) NOT NULL,
-    email     VARCHAR(100) NOT NULL
+    email     VARCHAR(100) NOT NULL,
+    shardkey  VARCHAR(10) NOT NULL DEFAULT ''
 );
 
 -- Таблица платежей
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS payments (
     bank          VARCHAR(50) NOT NULL,
     delivery_cost INTEGER NOT NULL,
     goods_total   INTEGER NOT NULL,
-    custom_fee    INTEGER NOT NULL
+    custom_fee    INTEGER NOT NULL,
+    shardkey      VARCHAR(10) NOT NULL DEFAULT ''
 );
 
 -- Таблица товаров
@@ -54,8 +56,13 @@ CREATE TABLE IF NOT EXISTS items (
     total_price  INTEGER NOT NULL,
     nm_id        BIGINT NOT NULL,
     brand        VARCHAR(100) NOT NULL,
-    status       INTEGER NOT NULL
+    status       INTEGER NOT NULL,
+    shardkey     VARCHAR(10) NOT NULL DEFAULT ''
 );
+
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS shardkey VARCHAR(10) NOT NULL DEFAULT '';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS shardkey VARCHAR(10) NOT NULL DEFAULT '';
+ALTER TABLE items ADD COLUMN IF NOT EXISTS shardkey VARCHAR(10) NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_items_order_uid ON items(order_uid);
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_service_uid ON orders(delivery_service);

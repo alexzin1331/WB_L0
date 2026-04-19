@@ -35,4 +35,12 @@
 
 #### Для запуска программы:
 1) Клонировать репозиторий
-2) Команда в консоль из корневой директории проекта: `docker-compose up --build`
+2) Из корневой директории проекта выполнить: `docker compose up --build`
+
+Если используется старая версия Docker Compose, команда будет такой: `docker-compose up --build`.
+Важно: между `up` и `--build` нужен пробел, вариант `docker-compose up--build` не сработает.
+
+После запуска:
+- Web/API: http://localhost:8081
+- Swagger: http://localhost:8081/swagger/index.html
+- Producer отправляет тестовые заказы в Kafka автоматически.

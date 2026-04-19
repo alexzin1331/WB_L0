@@ -1,27 +1,21 @@
-package storage_test
+package storage
 
 import (
-	"WB_LVL0/server/internal/storage"
-	"WB_LVL0/server/models"
+	"context"
 	"encoding/json"
-	"github.com/go-redis/redismock/v8"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"WB_LVL0/server/models"
+
+	"github.com/go-redis/redismock/v8"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-/*
-
-!!!!!!!WARNING!!!!!!!!
-
-THIS TESTS AREN'T WORK
-I MADE THEM AS A TEMPORARY OPTION.
-
-*/
-
-func getTestOrder() models.Order {
+func testOrder() models.Order {
 	return models.Order{
-		OrderUID:          "test123",
+		OrderUID:          "test-order-123",
 		TrackNumber:       "TRACK123",
 		Entry:             "entry1",
 		Locale:            "en",
@@ -34,7 +28,7 @@ func getTestOrder() models.Order {
 		OofShard:          "oof",
 		Delivery: models.Delivery{
 			Name:    "John Doe",
-			Phone:   "1234567890",
+			Phone:   "+1234567890",
 			Zip:     "12345",
 			City:    "City",
 			Address: "Some street",
@@ -45,7 +39,7 @@ func getTestOrder() models.Order {
 			Transaction:  "txn123",
 			RequestID:    "req123",
 			Currency:     "USD",
-			Provider:     "visa",
+			Provider:     "wbpay",
 			Amount:       1000,
 			PaymentDt:    1638349200,
 			Bank:         "Bank",
@@ -71,93 +65,54 @@ func getTestOrder() models.Order {
 	}
 }
 
-//func TestSaveOrder_Success(t *testing.T) {
-//_, _, err := sqlmock.New()
-/*require.NoError(t, err)
-defer db.Close()
-
-rdb, _ := redismock.NewClientMock()
-
-st := &storage.Storage{
-	DB:    db,
-	Redis: rdb,
-}
-
-order := getTestOrder()
-
-ctx := context.Background()
-
-mock.ExpectBegin()
-
-// Orders insert
-mock.ExpectExec(`INSERT INTO orders`).WithArgs(
-	order.OrderUID, order.TrackNumber, order.Entry, order.Locale,
-	order.InternalSignature, order.CustomerID, order.DeliveryService,
-	order.Shardkey, order.SmID, order.DateCreated, order.OofShard).
-	WillReturnResult(sqlmock.NewResult(1, 1))
-
-// Deliveries insert
-mock.ExpectExec(`INSERT INTO deliveries`).WithArgs(
-	order.OrderUID, order.Delivery.Name, order.Delivery.Phone,
-	order.Delivery.Zip, order.Delivery.City, order.Delivery.Address,
-	order.Delivery.Region, order.Delivery.Email).
-	WillReturnResult(sqlmock.NewResult(1, 1))
-
-// Payments insert
-mock.ExpectExec(`INSERT INTO payments`).WithArgs(
-	order.OrderUID, order.Payment.Transaction, order.Payment.RequestID,
-	order.Payment.Currency, order.Payment.Provider, order.Payment.Amount,
-	order.Payment.PaymentDt, order.Payment.Bank, order.Payment.DeliveryCost,
-	order.Payment.GoodsTotal, order.Payment.CustomFee).
-	WillReturnResult(sqlmock.NewResult(1, 1))
-
-// Items insert
-mock.ExpectExec(`INSERT INTO items`).WithArgs(
-	order.OrderUID, order.Items[0].ChrtID, order.Items[0].TrackNumber,
-	order.Items[0].Price, order.Items[0].Rid, order.Items[0].Name,
-	order.Items[0].Sale, order.Items[0].Size, order.Items[0].TotalPrice,
-	order.Items[0].NmID, order.Items[0].Brand, order.Items[0].Status).
-	WillReturnResult(sqlmock.NewResult(1, 1))
-
-mock.ExpectCommit()*/
-
-//assert.NoError(t, err)
-//assert.NoError(t, mock.ExpectationsWereMet())
-//}
-
-func TestSaveToRedis(t *testing.T) {
-	_, mock := redismock.NewClientMock()
-	order := getTestOrder()
-	//ctx := context.Background()
-
-	/*st := &storage.Storage{
-		Redis: rdb,
-	}*/
-
-	orderJSON, _ := json.Marshal(order)
-
-	mock.ExpectSet(order.OrderUID, orderJSON, 72*time.Hour).SetVal("OK")
-	mock.ExpectLPush("recently used", order.OrderUID).SetVal(1)
-	mock.ExpectLLen("recently used").SetVal(1)
-
-	//err := st.SaveOrder(ctx, order) // uses saveToRedis internally after DB
-	var err error
-	assert.NoError(t, err)
-	//assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestGetFromCache_Success(t *testing.T) {
+func TestGetFromCacheSuccess(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	order := getTestOrder()
+	order := testOrder()
+	st := &Storage{Redis: rdb}
 
-	st := &storage.Storage{
-		Redis: rdb,
-	}
+	orderJSON, err := json.Marshal(order)
+	require.NoError(t, err)
 
-	orderJSON, _ := json.Marshal(order)
 	mock.ExpectGet(order.OrderUID).SetVal(string(orderJSON))
 
-	res, err := st.GetOrder(order.OrderUID) // uses getFromCache internally
-	assert.NoError(t, err)
-	assert.Equal(t, order.OrderUID, res.OrderUID)
+	got, err := st.getFromCache(context.Background(), order.OrderUID)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+	assert.Equal(t, order.OrderUID, got.OrderUID)
+}
+
+func TestSaveToRedisSuccess(t *testing.T) {
+	rdb, mock := redismock.NewClientMock()
+	order := testOrder()
+	st := &Storage{Redis: rdb}
+
+	orderJSON, err := json.Marshal(order)
+	require.NoError(t, err)
+
+	mock.ExpectSet(order.OrderUID, orderJSON, 72*time.Hour).SetVal("OK")
+	mock.ExpectLPush(recentOrdersKey, order.OrderUID).SetVal(1)
+	mock.ExpectLLen(recentOrdersKey).SetVal(1)
+
+	require.NoError(t, st.saveToRedis(context.Background(), &order))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSaveToRedisTrimsOverflow(t *testing.T) {
+	rdb, mock := redismock.NewClientMock()
+	order := testOrder()
+	st := &Storage{Redis: rdb}
+	oldUIDs := []string{"old-order-1", "old-order-2"}
+
+	orderJSON, err := json.Marshal(order)
+	require.NoError(t, err)
+
+	mock.ExpectSet(order.OrderUID, orderJSON, 72*time.Hour).SetVal("OK")
+	mock.ExpectLPush(recentOrdersKey, order.OrderUID).SetVal(cacheLimit + int64(len(oldUIDs)))
+	mock.ExpectLLen(recentOrdersKey).SetVal(cacheLimit + int64(len(oldUIDs)))
+	mock.ExpectLRange(recentOrdersKey, cacheLimit, cacheLimit+int64(len(oldUIDs))-1).SetVal(oldUIDs)
+	mock.ExpectDel(oldUIDs...).SetVal(int64(len(oldUIDs)))
+	mock.ExpectLTrim(recentOrdersKey, 0, cacheLimit-1).SetVal("OK")
+
+	require.NoError(t, st.saveToRedis(context.Background(), &order))
+	require.NoError(t, mock.ExpectationsWereMet())
 }

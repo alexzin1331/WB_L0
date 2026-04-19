@@ -2,10 +2,11 @@ package models
 
 import (
 	"fmt"
-	"github.com/ilyakaznacheev/cleanenv"
 	"log"
 	"regexp"
 	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type ValidationError struct {
@@ -32,7 +33,7 @@ type Redis struct {
 
 type ServerCfg struct {
 	Timeout time.Duration `yaml:"timeout" env:"TIMEOUT" env-default:"10s"`
-	Host    string        `yaml:"hostGateway" env:"HostGateway" env-default:":8081"`
+	Host    string        `yaml:"host" env:"HOST" env-default:":8081"`
 }
 
 type DatabaseCfg struct {
@@ -46,8 +47,7 @@ type DatabaseCfg struct {
 func MustLoad(path string) *Config {
 	conf := &Config{}
 	if err := cleanenv.ReadConfig(path, conf); err != nil {
-		log.Fatal("Can't read the common config")
-		return nil
+		log.Fatalf("read config %q: %v", path, err)
 	}
 	return conf
 }

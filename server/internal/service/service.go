@@ -1,10 +1,12 @@
 package service
 
 import (
-	"WB_LVL0/server/models"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
+
+	"WB_LVL0/server/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Service struct {
@@ -32,11 +34,12 @@ func NewService(o OrderProvider) *Service {
 // @Router /order/{order_uid} [get]
 func (s *Service) GetOrder(c *gin.Context) {
 	orderUID := c.Param("order_uid")
-	//get order from PostgreSQL or Redis
 	order, err := s.OrderProvider.GetOrder(orderUID)
 	if err != nil {
-		log.Printf("error of getting order: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error: ": err.Error()})
+		log.Printf("get order %q: %v", orderUID, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+
 	c.JSON(http.StatusOK, order)
 }
