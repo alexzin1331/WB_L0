@@ -43,4 +43,19 @@
 После запуска:
 - Web/API: http://localhost:8081
 - Swagger: http://localhost:8081/swagger/index.html
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000 (`admin` / `admin`)
 - Producer отправляет тестовые заказы в Kafka автоматически.
+
+#### Авторизация и новые ручки:
+- `POST /api/auth/register` - создание пользователя, тело: `{"username":"admin","password":"secret123"}`
+- `POST /api/auth/login` - получение JWT
+- `GET /api/auth/me` - текущий пользователь
+- `GET /api/orders` - краткий список заказов с фильтрами: `phone`, `customer_id`, `delivery_service`, `bank`, `currency`, `city`, `region`, `shardkey`, `limit`
+- `GET /api/order/{order_uid}` - полная информация по заказу
+- `GET /api/orders/aggregate?group_by=delivery_service` - агрегации. Доступные `group_by`: `phone`, `customer_id`, `delivery_service`, `track_number`, `bank`, `currency`, `locale`, `city`, `region`, `shardkey`
+- `GET /api/orders/filter-values` - значения для фильтров
+
+Для защищённых ручек нужен заголовок: `Authorization: Bearer <token>`.
+
+Интервал отправки заказов producer настраивается переменной окружения `PRODUCER_SEND_INTERVAL_SECONDS`.

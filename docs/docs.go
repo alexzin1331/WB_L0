@@ -41,7 +41,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Order"
+                            "$ref": "#/definitions/WB_LVL0_server_models.Order"
                         }
                     },
                     "400": {
@@ -58,7 +58,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.Delivery": {
+        "WB_LVL0_server_models.Delivery": {
             "type": "object",
             "properties": {
                 "address": {
@@ -84,7 +84,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Item": {
+        "WB_LVL0_server_models.Item": {
             "type": "object",
             "properties": {
                 "brand": {
@@ -122,7 +122,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Order": {
+        "WB_LVL0_server_models.Order": {
             "type": "object",
             "properties": {
                 "customer_id": {
@@ -132,7 +132,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "delivery": {
-                    "$ref": "#/definitions/models.Delivery"
+                    "$ref": "#/definitions/WB_LVL0_server_models.Delivery"
                 },
                 "delivery_service": {
                     "type": "string"
@@ -146,7 +146,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.Item"
+                        "$ref": "#/definitions/WB_LVL0_server_models.Item"
                     }
                 },
                 "locale": {
@@ -159,7 +159,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "payment": {
-                    "$ref": "#/definitions/models.Payment"
+                    "$ref": "#/definitions/WB_LVL0_server_models.Payment"
                 },
                 "shardkey": {
                     "type": "string"
@@ -172,7 +172,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Payment": {
+        "WB_LVL0_server_models.Payment": {
             "type": "object",
             "properties": {
                 "amount": {

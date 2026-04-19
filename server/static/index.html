@@ -3,81 +3,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Lookup</title>
+    <title>WB Orders</title>
     <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f6f8;
+            --panel: #ffffff;
+            --text: #17202a;
+            --muted: #5c6b73;
+            --line: #d8dee4;
+            --accent: #126c83;
+            --accent-strong: #0d5061;
+            --danger: #b3261e;
+            --success: #1b7f45;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
         }
-        .search-box {
+
+        header {
             display: flex;
-            margin-bottom: 20px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 28px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--line);
         }
-        #orderId {
-            flex: 1;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 4px 0 0 4px;
+
+        h1, h2, h3 {
+            margin: 0;
         }
+
+        h1 {
+            font-size: 24px;
+        }
+
+        main {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        button, input, select {
+            font: inherit;
+        }
+
         button {
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 0 4px 4px 0;
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            background: var(--accent);
+            color: #ffffff;
             cursor: pointer;
-            font-size: 16px;
         }
+
+        button.secondary {
+            background: #ffffff;
+            color: var(--accent);
+        }
+
         button:hover {
-            background-color: #45a049;
+            background: var(--accent-strong);
+            color: #ffffff;
         }
-        .result {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f9f9f9;
+
+        input, select {
+            width: 100%;
+            min-height: 40px;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #ffffff;
+            color: var(--text);
         }
-        .error {
-            color: #d32f2f;
-            background-color: #ffebee;
+
+        label {
+            display: grid;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 18px;
+        }
+
+        .auth-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(160px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            background: #ffffff;
+            color: var(--accent);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .stack {
+            display: grid;
+            gap: 16px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .status {
+            min-height: 22px;
+            color: var(--muted);
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .status.ok {
+            color: var(--success);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            min-width: 900px;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        th, td {
             padding: 10px;
-            border-radius: 4px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            white-space: nowrap;
         }
-        .order-section {
-            margin-bottom: 15px;
-            padding: 10px;
-            border-left: 3px solid #2196F3;
-            background-color: #e3f2fd;
+
+        th {
+            background: #eef2f4;
+            color: var(--muted);
+            font-size: 13px;
         }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .order-detail {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .detail-block {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+        }
+
+        .detail-block p {
+            margin: 7px 0;
+        }
+
         .items-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
         }
+
         .item-card {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: white;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px;
+            background: #ffffff;
+        }
+
+        @media (max-width: 860px) {
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+                padding: 16px;
+            }
+
+            main {
+                padding: 16px;
+            }
+
+            .auth-grid, .form-grid, .order-detail {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-<h1>Поиск заказа</h1>
+<header>
+    <h1>WB Orders</h1>
+    <div id="sessionBox" class="status"></div>
+</header>
 
-<div class="search-box">
-    <input type="text" id="orderId" placeholder="Введите ID заказа">
-    <button onclick="getOrder()">Найти</button>
-</div>
+<main class="stack">
+    <section id="authSection" class="auth-grid">
+        <form id="loginForm" class="panel stack">
+            <h2>Вход</h2>
+            <label>Логин
+                <input id="loginUsername" autocomplete="username" required>
+            </label>
+            <label>Пароль
+                <input id="loginPassword" type="password" autocomplete="current-password" required>
+            </label>
+            <button type="submit">Войти</button>
+            <div id="loginStatus" class="status"></div>
+        </form>
 
-<div id="result"></div>
+        <form id="registerForm" class="panel stack">
+            <h2>Регистрация</h2>
+            <label>Логин
+                <input id="registerUsername" autocomplete="username" required>
+            </label>
+            <label>Пароль
+                <input id="registerPassword" type="password" autocomplete="new-password" required>
+            </label>
+            <button type="submit">Создать пользователя</button>
+            <div id="registerStatus" class="status"></div>
+        </form>
+    </section>
 
-<!-- <script src="/server/static/script.js"></script> -->
+    <section id="appSection" class="hidden stack">
+        <div class="toolbar">
+            <div class="tabs">
+                <button class="tab active" data-tab="ordersPanel" type="button">Заказы</button>
+                <button class="tab" data-tab="aggregatePanel" type="button">Агрегации</button>
+                <button class="tab" data-tab="detailPanel" type="button">Детали</button>
+            </div>
+            <button id="logoutBtn" class="secondary" type="button">Выйти</button>
+        </div>
+
+        <section id="ordersPanel" class="panel stack">
+            <div class="toolbar">
+                <h2>Краткий список</h2>
+                <button id="loadOrdersBtn" type="button">Обновить</button>
+            </div>
+            <form id="filtersForm" class="form-grid">
+                <label>Телефон
+                    <select id="filterPhone"></select>
+                </label>
+                <label>Клиент
+                    <select id="filterCustomer"></select>
+                </label>
+                <label>Служба доставки
+                    <select id="filterDelivery"></select>
+                </label>
+                <label>Банк
+                    <select id="filterBank"></select>
+                </label>
+                <label>Валюта
+                    <select id="filterCurrency"></select>
+                </label>
+                <label>Город
+                    <select id="filterCity"></select>
+                </label>
+                <label>Регион
+                    <select id="filterRegion"></select>
+                </label>
+                <label>Shardkey
+                    <select id="filterShardkey"></select>
+                </label>
+                <label>Лимит
+                    <input id="filterLimit" type="number" min="1" max="500" value="100">
+                </label>
+                <button type="submit">Применить</button>
+            </form>
+            <div id="ordersStatus" class="status"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Order UID</th>
+                        <th>Телефон</th>
+                        <th>Клиент</th>
+                        <th>Доставка</th>
+                        <th>Банк</th>
+                        <th>Сумма</th>
+                        <th>Город</th>
+                        <th>Товары</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="ordersBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="aggregatePanel" class="panel stack hidden">
+            <div class="toolbar">
+                <h2>Агрегации</h2>
+                <button id="loadAggregateBtn" type="button">Посчитать</button>
+            </div>
+            <div class="form-grid">
+                <label>Группировка
+                    <select id="groupBy">
+                        <option value="delivery_service">Служба доставки</option>
+                        <option value="phone">Телефон</option>
+                        <option value="bank">Банк</option>
+                        <option value="currency">Валюта</option>
+                        <option value="city">Город</option>
+                        <option value="region">Регион</option>
+                        <option value="customer_id">Клиент</option>
+                        <option value="shardkey">Shardkey</option>
+                        <option value="locale">Локаль</option>
+                    </select>
+                </label>
+            </div>
+            <div id="aggregateStatus" class="status"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Группа</th>
+                        <th>Заказы</th>
+                        <th>Сумма</th>
+                        <th>Средний чек</th>
+                        <th>Товары</th>
+                    </tr>
+                    </thead>
+                    <tbody id="aggregateBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="detailPanel" class="panel stack hidden">
+            <div class="toolbar">
+                <h2>Детали заказа</h2>
+                <form id="detailForm" class="toolbar">
+                    <input id="detailOrderUid" placeholder="Order UID">
+                    <button type="submit">Открыть</button>
+                </form>
+            </div>
+            <div id="detailStatus" class="status"></div>
+            <div id="detailResult"></div>
+        </section>
+    </section>
+</main>
+
 <script src="/static/script.js"></script>
 </body>
 </html>

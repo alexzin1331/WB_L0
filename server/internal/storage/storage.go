@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +35,19 @@ type Storage struct {
 	Redis *redis.Client
 }
 
+var aggregationGroups = map[string]string{
+	"phone":            "d.phone",
+	"customer_id":      "o.customer_id",
+	"delivery_service": "o.delivery_service",
+	"track_number":     "o.track_number",
+	"bank":             "p.bank",
+	"currency":         "p.currency",
+	"locale":           "o.locale",
+	"city":             "d.city",
+	"region":           "d.region",
+	"shardkey":         "o.shardkey",
+}
+
 func initRedis(config models.Config) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     config.RDBConf.RedisAddress,
@@ -47,8 +62,14 @@ func initRedis(config models.Config) (*redis.Client, error) {
 }
 
 // run migrations for PostgreSQL
-func runMigrations(db *sql.DB) error {
+func runMigrations(connStr string) error {
 	const op = "storage.migrations"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("%s: open migration connection: %w", op, err)
+	}
+	defer db.Close()
+
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("%s: create postgres driver: %w", op, err)
@@ -62,6 +83,15 @@ func runMigrations(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("%s: create migrate instance: %w", op, err)
 	}
+	defer func() {
+		sourceErr, databaseErr := m.Close()
+		if sourceErr != nil {
+			log.Printf("%s: close migration source: %v", op, sourceErr)
+		}
+		if databaseErr != nil {
+			log.Printf("%s: close migration database: %v", op, databaseErr)
+		}
+	}()
 
 	if err = m.Up(); err != nil {
 		if err != migrate.ErrNoChange {
@@ -105,7 +135,7 @@ func New(c models.Config) (*Storage, error) {
 		Redis: rdb,
 	}
 
-	if err = runMigrations(db); err != nil {
+	if err = runMigrations(connStr); err != nil {
 		rdb.Close()
 		db.Close()
 		return nil, fmt.Errorf("%s: run migrations: %w", op, err)
@@ -324,6 +354,235 @@ func (s *Storage) SaveOrder(ctx context.Context, order models.Order) error {
 	return nil
 }
 
+func (s *Storage) CreateUser(ctx context.Context, username, passwordHash string) (*models.User, error) {
+	query := `INSERT INTO users (username, password_hash) VALUES ($1, $2)
+		RETURNING id, username, password_hash, created_at`
+
+	var user models.User
+	if err := s.DB.QueryRowContext(ctx, query, username, passwordHash).Scan(
+		&user.ID,
+		&user.Username,
+		&user.PasswordHash,
+		&user.CreatedAt,
+	); err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (s *Storage) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	query := `SELECT id, username, password_hash, created_at FROM users WHERE username = $1`
+
+	var user models.User
+	if err := s.DB.QueryRowContext(ctx, query, username).Scan(
+		&user.ID,
+		&user.Username,
+		&user.PasswordHash,
+		&user.CreatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("user not found")
+		}
+		return nil, fmt.Errorf("get user by username: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (s *Storage) GetUserByID(ctx context.Context, userID int64) (*models.User, error) {
+	query := `SELECT id, username, password_hash, created_at FROM users WHERE id = $1`
+
+	var user models.User
+	if err := s.DB.QueryRowContext(ctx, query, userID).Scan(
+		&user.ID,
+		&user.Username,
+		&user.PasswordHash,
+		&user.CreatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("user not found")
+		}
+		return nil, fmt.Errorf("get user by id: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (s *Storage) ListOrderSummaries(ctx context.Context, filters models.OrderFilters) ([]models.OrderSummary, error) {
+	clauses, args := buildOrderFilterClauses(filters)
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	args = append(args, limit)
+
+	query := fmt.Sprintf(`SELECT
+		o.order_uid,
+		o.track_number,
+		d.phone,
+		o.customer_id,
+		o.delivery_service,
+		o.locale,
+		o.shardkey,
+		o.sm_id,
+		o.date_created,
+		d.city,
+		d.region,
+		p.currency,
+		p.amount,
+		p.bank,
+		p.goods_total,
+		COUNT(i.id) AS items_count
+	FROM orders o
+	JOIN deliveries d ON d.order_uid = o.order_uid
+	JOIN payments p ON p.order_uid = o.order_uid
+	LEFT JOIN items i ON i.order_uid = o.order_uid
+	%s
+	GROUP BY o.order_uid, o.track_number, d.phone, o.customer_id, o.delivery_service,
+		o.locale, o.shardkey, o.sm_id, o.date_created, d.city, d.region,
+		p.currency, p.amount, p.bank, p.goods_total
+	ORDER BY o.date_created DESC
+	LIMIT $%d`, whereSQL(clauses), len(args))
+
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list order summaries: %w", err)
+	}
+	defer rows.Close()
+
+	orders := make([]models.OrderSummary, 0)
+	for rows.Next() {
+		var order models.OrderSummary
+		if err := rows.Scan(
+			&order.OrderUID,
+			&order.TrackNumber,
+			&order.Phone,
+			&order.CustomerID,
+			&order.DeliveryService,
+			&order.Locale,
+			&order.Shardkey,
+			&order.SmID,
+			&order.DateCreated,
+			&order.City,
+			&order.Region,
+			&order.Currency,
+			&order.Amount,
+			&order.Bank,
+			&order.GoodsTotal,
+			&order.ItemsCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan order summary: %w", err)
+		}
+		orders = append(orders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate order summaries: %w", err)
+	}
+
+	return orders, nil
+}
+
+func (s *Storage) AggregateOrders(ctx context.Context, groupBy string, filters models.OrderFilters) ([]models.OrderAggregation, error) {
+	groupExpr, ok := aggregationGroups[groupBy]
+	if !ok {
+		return nil, fmt.Errorf("unsupported group_by %q", groupBy)
+	}
+
+	clauses, args := buildOrderFilterClauses(filters)
+	query := fmt.Sprintf(`SELECT
+		%s AS group_key,
+		COUNT(*) AS orders_count,
+		COALESCE(SUM(p.amount), 0) AS total_amount,
+		COALESCE(AVG(p.amount), 0) AS average_amount,
+		COALESCE(SUM(item_counts.items_count), 0) AS items_count
+	FROM orders o
+	JOIN deliveries d ON d.order_uid = o.order_uid
+	JOIN payments p ON p.order_uid = o.order_uid
+	LEFT JOIN (
+		SELECT order_uid, COUNT(*) AS items_count
+		FROM items
+		GROUP BY order_uid
+	) item_counts ON item_counts.order_uid = o.order_uid
+	%s
+	GROUP BY %s
+	ORDER BY orders_count DESC, group_key ASC`, groupExpr, whereSQL(clauses), groupExpr)
+
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate orders: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]models.OrderAggregation, 0)
+	for rows.Next() {
+		var item models.OrderAggregation
+		if err := rows.Scan(&item.Key, &item.Orders, &item.Total, &item.Average, &item.ItemsCount); err != nil {
+			return nil, fmt.Errorf("scan order aggregation: %w", err)
+		}
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate order aggregations: %w", err)
+	}
+
+	return result, nil
+}
+
+func (s *Storage) GetOrderFilterValues(ctx context.Context) (*models.OrderFilterValues, error) {
+	values := &models.OrderFilterValues{}
+
+	loaders := []struct {
+		query string
+		dst   *[]string
+	}{
+		{`SELECT DISTINCT phone FROM deliveries ORDER BY phone`, &values.Phones},
+		{`SELECT DISTINCT customer_id FROM orders ORDER BY customer_id`, &values.Customers},
+		{`SELECT DISTINCT delivery_service FROM orders ORDER BY delivery_service`, &values.DeliveryServices},
+		{`SELECT DISTINCT bank FROM payments ORDER BY bank`, &values.Banks},
+		{`SELECT DISTINCT currency FROM payments ORDER BY currency`, &values.Currencies},
+		{`SELECT DISTINCT locale FROM orders ORDER BY locale`, &values.Locales},
+		{`SELECT DISTINCT city FROM deliveries ORDER BY city`, &values.Cities},
+		{`SELECT DISTINCT region FROM deliveries ORDER BY region`, &values.Regions},
+		{`SELECT DISTINCT shardkey FROM orders ORDER BY shardkey`, &values.Shardkeys},
+	}
+
+	for _, loader := range loaders {
+		items, err := s.distinctStrings(ctx, loader.query)
+		if err != nil {
+			return nil, err
+		}
+		*loader.dst = items
+	}
+
+	return values, nil
+}
+
+func (s *Storage) distinctStrings(ctx context.Context, query string) ([]string, error) {
+	rows, err := s.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("load distinct values: %w", err)
+	}
+	defer rows.Close()
+
+	values := make([]string, 0)
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			return nil, fmt.Errorf("scan distinct value: %w", err)
+		}
+		values = append(values, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate distinct values: %w", err)
+	}
+
+	return values, nil
+}
+
 // get data from Redis
 func (s *Storage) getFromCache(ctx context.Context, orderUID string) (*models.Order, error) {
 	val, err := s.Redis.Get(ctx, orderUID).Result()
@@ -340,6 +599,39 @@ func (s *Storage) getFromCache(ctx context.Context, orderUID string) (*models.Or
 	}
 
 	return &order, nil
+}
+
+func buildOrderFilterClauses(filters models.OrderFilters) ([]string, []interface{}) {
+	clauses := make([]string, 0)
+	args := make([]interface{}, 0)
+
+	add := func(column, value string) {
+		if value == "" {
+			return
+		}
+		args = append(args, value)
+		clauses = append(clauses, column+" = $"+strconv.Itoa(len(args)))
+	}
+
+	add("d.phone", filters.Phone)
+	add("o.customer_id", filters.CustomerID)
+	add("o.delivery_service", filters.DeliveryService)
+	add("o.track_number", filters.TrackNumber)
+	add("p.bank", filters.Bank)
+	add("p.currency", filters.Currency)
+	add("o.locale", filters.Locale)
+	add("d.city", filters.City)
+	add("d.region", filters.Region)
+	add("o.shardkey", filters.Shardkey)
+
+	return clauses, args
+}
+
+func whereSQL(clauses []string) string {
+	if len(clauses) == 0 {
+		return ""
+	}
+	return "WHERE " + strings.Join(clauses, " AND ")
 }
 
 // GetOrder retrieves an order by its UID using cache-first strategy:

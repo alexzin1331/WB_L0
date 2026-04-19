@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  models.Delivery:
+  WB_LVL0_server_models.Delivery:
     properties:
       address:
         type: string
@@ -17,7 +17,7 @@ definitions:
       zip:
         type: string
     type: object
-  models.Item:
+  WB_LVL0_server_models.Item:
     properties:
       brand:
         type: string
@@ -42,14 +42,14 @@ definitions:
       track_number:
         type: string
     type: object
-  models.Order:
+  WB_LVL0_server_models.Order:
     properties:
       customer_id:
         type: string
       date_created:
         type: string
       delivery:
-        $ref: '#/definitions/models.Delivery'
+        $ref: '#/definitions/WB_LVL0_server_models.Delivery'
       delivery_service:
         type: string
       entry:
@@ -58,7 +58,7 @@ definitions:
         type: string
       items:
         items:
-          $ref: '#/definitions/models.Item'
+          $ref: '#/definitions/WB_LVL0_server_models.Item'
         type: array
       locale:
         type: string
@@ -67,7 +67,7 @@ definitions:
       order_uid:
         type: string
       payment:
-        $ref: '#/definitions/models.Payment'
+        $ref: '#/definitions/WB_LVL0_server_models.Payment'
       shardkey:
         type: string
       sm_id:
@@ -75,7 +75,7 @@ definitions:
       track_number:
         type: string
     type: object
-  models.Payment:
+  WB_LVL0_server_models.Payment:
     properties:
       amount:
         type: integer
@@ -122,7 +122,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Order'
+            $ref: '#/definitions/WB_LVL0_server_models.Order'
         "400":
           description: Bad Request
           schema:

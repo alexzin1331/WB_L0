@@ -2,21 +2,24 @@ package main
 
 import (
 	_ "WB_LVL0/docs"
+	"WB_LVL0/server/internal/auth"
+	"WB_LVL0/server/internal/observability"
 	"WB_LVL0/server/internal/service"
 	"WB_LVL0/server/internal/storage"
 	k "WB_LVL0/server/kafka"
 	"WB_LVL0/server/models"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const (
@@ -40,17 +43,33 @@ func main() {
 	reader := k.NewReader()
 	defer reader.Close()
 	//init service
-	serv := service.NewService(db)
+	authManager := auth.NewManager(cfg.AuthConf.JWTSecret, cfg.AuthConf.TokenTTL)
+	serv := service.NewService(db, authManager)
 	//init router
-	router := gin.Default()
+	metrics := observability.NewMetrics()
+	router := gin.New()
+	router.Use(gin.Logger(), gin.Recovery(), metrics.Middleware())
 	setupPprof(router)
 	router.GET("/", func(c *gin.Context) {
 		//c.File("./server/static/index.html") -- local
 		c.File("./static/index.html")
 
 	})
+	router.GET("/metrics", metrics.Handler)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/order/:order_uid", serv.GetOrder)
+
+	router.POST("/api/auth/register", serv.Register)
+	router.POST("/api/auth/login", serv.Login)
+	api := router.Group("/api", serv.AuthRequired())
+	{
+		api.GET("/auth/me", serv.Me)
+		api.GET("/orders", serv.ListOrders)
+		api.GET("/orders/aggregate", serv.AggregateOrders)
+		api.GET("/orders/filter-values", serv.GetFilterValues)
+		api.GET("/order/:order_uid", serv.GetOrder)
+	}
+
 	router.Static("/static", "./static")
 	//router.Static("/server/static", "./server/static")
 

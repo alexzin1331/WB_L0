@@ -13,6 +13,9 @@ redis:
   redis_address: "redis:6379"
   redis_password: ""
   redis_db: 0
+auth:
+  jwt_secret: "dev-secret-change-me"
+  token_ttl: 24h
 
 
 

@@ -23,6 +23,7 @@ type Config struct {
 	ServConf ServerCfg   `yaml:"server"`
 	DBConf   DatabaseCfg `yaml:"database"`
 	RDBConf  Redis       `yaml:"redis"`
+	AuthConf AuthCfg     `yaml:"auth"`
 }
 
 type Redis struct {
@@ -42,6 +43,11 @@ type DatabaseCfg struct {
 	Password string `yaml:"password" env:"DB_PASSWORD" env-default:"1234"`
 	DBName   string `yaml:"dbname" env:"DB_NAME" env-default:"postgres"`
 	Host     string `yaml:"host" env:"DB_HOST" env-default:"localhost"`
+}
+
+type AuthCfg struct {
+	JWTSecret string        `yaml:"jwt_secret" env:"JWT_SECRET" env-default:"dev-secret-change-me"`
+	TokenTTL  time.Duration `yaml:"token_ttl" env:"JWT_TTL" env-default:"24h"`
 }
 
 func MustLoad(path string) *Config {
@@ -109,6 +115,76 @@ type Item struct {
 
 type GetOrderRequest struct {
 	OrderUID string `json:"order_uid"`
+}
+
+type User struct {
+	ID           int64     `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type AuthRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+type OrderFilters struct {
+	Phone           string
+	CustomerID      string
+	DeliveryService string
+	TrackNumber     string
+	Bank            string
+	Currency        string
+	Locale          string
+	City            string
+	Region          string
+	Shardkey        string
+	Limit           int
+}
+
+type OrderSummary struct {
+	OrderUID        string    `json:"order_uid"`
+	TrackNumber     string    `json:"track_number"`
+	Phone           string    `json:"phone"`
+	CustomerID      string    `json:"customer_id"`
+	DeliveryService string    `json:"delivery_service"`
+	Locale          string    `json:"locale"`
+	Shardkey        string    `json:"shardkey"`
+	SmID            int       `json:"sm_id"`
+	DateCreated     time.Time `json:"date_created"`
+	City            string    `json:"city"`
+	Region          string    `json:"region"`
+	Currency        string    `json:"currency"`
+	Amount          int       `json:"amount"`
+	Bank            string    `json:"bank"`
+	GoodsTotal      int       `json:"goods_total"`
+	ItemsCount      int       `json:"items_count"`
+}
+
+type OrderAggregation struct {
+	Key        string  `json:"key"`
+	Orders     int     `json:"orders"`
+	Total      int     `json:"total"`
+	Average    float64 `json:"average"`
+	ItemsCount int     `json:"items_count"`
+}
+
+type OrderFilterValues struct {
+	Phones           []string `json:"phones"`
+	Customers        []string `json:"customers"`
+	DeliveryServices []string `json:"delivery_services"`
+	Banks            []string `json:"banks"`
+	Currencies       []string `json:"currencies"`
+	Locales          []string `json:"locales"`
+	Cities           []string `json:"cities"`
+	Regions          []string `json:"regions"`
+	Shardkeys        []string `json:"shardkeys"`
 }
 
 var (
